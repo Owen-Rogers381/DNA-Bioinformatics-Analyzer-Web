@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BioLab — DNA Analyzer</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1120;--panel:#111c30;--line:#263650;--muted:#9aacbf;--cyan:#67e8f9;--green:#86efac}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#132944,var(--bg) 58%);color:#e6eef8;font:15px/1.5 Inter,system-ui,sans-serif}
+main{max-width:1050px;margin:auto;padding:32px 20px 60px}.brand{display:flex;gap:12px;align-items:center}.logo{width:44px;height:44px;display:grid;place-items:center;background:#123448;border:1px solid #23627a;border-radius:13px;font-size:25px;color:var(--cyan)}
+h1{font-size:24px;margin:0}header p,.muted{color:var(--muted);margin:3px 0}header{margin-bottom:26px}.pill{margin-left:auto;border:1px solid #275c50;background:#10352e;color:var(--green);padding:5px 10px;border-radius:99px;font-size:12px}
+.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}.panel{background:#101b2d;border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0}h2{font-size:17px;margin:0 0 12px}label{display:block;color:#c5d3e4;margin:12px 0 7px}textarea{width:100%;min-height:124px;resize:vertical;background:#091322;border:1px solid #30445e;border-radius:10px;color:#e7f3ff;padding:13px;font:14px/1.7 ui-monospace,monospace;outline:none}textarea:focus{border-color:var(--cyan)}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}button{cursor:pointer;border-radius:10px;padding:10px 15px;font-weight:650;border:1px solid #2a536a;background:#15364a;color:var(--cyan)}button.primary{background:var(--cyan);color:#06202a;border-color:var(--cyan)}button:disabled{opacity:.5;cursor:wait}.notice{color:var(--muted);font-size:12px;margin-top:9px}.error{color:#fca5a5;margin-top:10px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.stat{background:#0b1525;border:1px solid #24344c;border-radius:11px;padding:12px}.stat span{display:block;color:var(--muted);font-size:12px}.stat strong{font-size:22px;color:var(--cyan)}.section{margin-top:16px}.sequence{font:13px/1.7 ui-monospace,monospace;overflow-wrap:anywhere;background:#0a1423;border:1px solid #22334a;border-radius:10px;padding:12px;max-height:140px;overflow:auto;color:#c9f6ff}.result-label{font-size:12px;color:var(--muted);margin:14px 0 6px}.history{margin-top:16px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #263650;vertical-align:top}th{color:var(--muted);font-weight:500}td.seq{max-width:260px;overflow-wrap:anywhere;font-family:ui-monospace,monospace}.empty{color:var(--muted);padding:15px 0}.foot{color:#74869d;font-size:12px;margin-top:18px}@media(max-width:760px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}main{padding:22px 13px}}
+</style></head>
+<body><main>
+<header><div class="brand"><div class="logo">⌬</div><div><h1>BioLab</h1><p>Анализатор нуклеотидных последовательностей</p></div><span class="pill" id="status">Проверка API…</span></div></header>
+<div class="grid">
+<section class="panel"><h2>Входные данные</h2><p class="muted">Введите ДНК-последовательность, содержащую A, T, G и C.</p>
+<label for="sequence">Последовательность ДНК</label><textarea id="sequence" spellcheck="false">ATGAGTAAAGGAGAAGAACTTTTCACTGGAGTTGTCCCAATTCTTGTTGAATTAGATGGT</textarea>
+<div class="actions"><button class="primary" id="analyze">▶ Анализировать</button><button id="sample">Загрузить пример</button><button id="clear">Очистить</button></div><div id="error" class="error" role="alert"></div><p class="notice">Пробелы и переносы строк игнорируются. Максимум — 100 000 нуклеотидов.</p></section>
+<section class="panel"><h2>Результаты анализа</h2><p class="muted" id="summary">Запустите анализ, чтобы увидеть результаты.</p>
+<div class="stats section"><div class="stat"><span>Длина</span><strong id="length">—</strong></div><div class="stat"><span>GC-состав</span><strong id="gc">—</strong></div><div class="stat"><span>Начало ORF</span><strong id="orf">—</strong></div><div class="stat"><span>Белок, aa</span><strong id="proteinLength">—</strong></div></div>
+<div class="result-label">Нуклеотидный состав (A / T / G / C)</div><div class="sequence" id="counts">—</div>
+<div class="result-label">Обратная комплементарная цепь</div><div class="sequence" id="reverse">—</div>
+<div class="result-label">мРНК (T → U)</div><div class="sequence" id="mrna">—</div>
+<div class="result-label">Белковая последовательность (однобуквенный код)</div><div class="sequence" id="protein">—</div>
+</section></div>
+<section class="panel history"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div><h2 style="margin-bottom:3px">История анализов</h2><p class="muted">Последние 50 записей, сохранённых в SQLite</p></div><button id="refresh" style="margin-left:auto">↻ Обновить</button></div><div id="history"><p class="empty">Загрузка истории…</p></div></section>
+<p class="foot">BioLab · Учебный прототип. Результаты трансляции относятся к первой рамке с начала последовательности; это не клинический инструмент.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const sample='ATGAGTAAAGGAGAAGAACTTTTCACTGGAGTTGTCCCAATTCTTGTTGAATTAGATGGT';
+$('sample').onclick=()=>{$('sequence').value=sample;$('error').textContent=''};
+$('clear').onclick=()=>{$('sequence').value='';$('error').textContent='';};
+$('analyze').onclick=async()=>{
+  $('error').textContent='';$('analyze').disabled=true;$('analyze').textContent='Анализ…';
+  try{
+    const r=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sequence:$('sequence').value})});
+    const data=await r.json();if(!r.ok)throw new Error(data.error||'Ошибка API');
+    $('summary').textContent=`Анализ #${data.id} сохранён · ${new Date(data.created_at).toLocaleString('ru-RU')}`;
+    $('length').textContent=data.length;$('gc').textContent=data.gc_percent.toFixed(2)+'%';
+    $('orf').textContent=data.orf_start?`${data.orf_start}–${data.orf_end}`:'не найдена';
+    $('proteinLength').textContent=data.protein.length;
+    $('counts').textContent=`A: ${data.counts.A} · T: ${data.counts.T} · G: ${data.counts.G} · C: ${data.counts.C}`;
+    $('reverse').textContent=data.reverse_complement;$('mrna').textContent=data.mrna;$('protein').textContent=data.protein||'Не удалось получить аминокислоты в первой рамке';
+    await loadHistory();
+  }catch(e){$('error').textContent=e.message;}finally{$('analyze').disabled=false;$('analyze').textContent='▶ Анализировать';}
+};
+async function loadHistory(){
+  try{
+    const r=await fetch('/api/history');if(!r.ok)throw new Error('Не удалось загрузить историю');
+    const list=await r.json(),root=$('history');
+    if(!list.length){root.innerHTML='<p class="empty">История пока пуста. Выполните первый анализ.</p>';return;}
+    const table=document.createElement('table');
+    table.innerHTML='<thead><tr><th>ID / время</th><th>Последовательность</th><th>Длина</th><th>GC%</th><th>Белок</th></tr></thead>';
+    const body=document.createElement('tbody');
+    for(const a of list){const tr=document.createElement('tr');const values=[`#${a.id}\n${new Date(a.created_at).toLocaleString('ru-RU')}`,a.sequence,String(a.length),a.gc_percent.toFixed(2)+'%',a.protein||'—'];values.forEach((v,i)=>{const td=document.createElement('td');td.textContent=v;if(i===1)td.className='seq';tr.appendChild(td)});body.appendChild(tr)}
+    table.appendChild(body);root.replaceChildren(table);
+  }catch(e){$('history').textContent=e.message}
+}
+$('refresh').onclick=loadHistory;
+fetch('/api/health').then(r=>r.ok?$('status').textContent='API онлайн':Promise.reject()).catch(()=>$('status').textContent='API недоступен');
+loadHistory();
+</script></body></html>
